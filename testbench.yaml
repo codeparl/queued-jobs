@@ -1,0 +1,9 @@
+providers:
+  - SchoolPalm\QueuedJobs\Providers\QueuedJobsServiceProvider
+
+workbench:
+  start: /workbench
+  user: schoolpalm
+  guard: web
+  assets: false
+  sync: []
