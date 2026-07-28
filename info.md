@@ -7,208 +7,209 @@ It allows module developers to create background jobs that automatically preserv
 - Tenant database context
 - School context
 - User context
-- Application execution context
+- Module context
+- Custom metadata
 
-## Overview
+## How It Works
 
-Laravel already provides a powerful queue system. This package does not replace Laravel queues. Instead, it extends Laravel jobs by adding SchoolPalm awareness.
-
-Module Developer | | v SchoolPalm Queued Jobs | | Attach SchoolPalm Context | | v Laravel Queue System | | v Database Queue (jobs table) | | v Queue Worker | | Restore Context | | Execute Job
+```
+Module Developer
+      |
+      v
+QueuedJobs::job(new Job())->dispatch()
+      |
+      v
+JobBuilder::prepare()
+  ├── Captures global context (tenant, school, user)
+  ├── Merges fluent overrides (->withSchool(), ->withUser())
+  └── Calls $job->setQueueContext(...)
+      |
+      v
+PendingJob::dispatch()
+  └── Dispatches directly via Bus\Dispatcher
+      (preserves exact job object with context)
+      |
+      v
+Laravel Queue System
+  └── Job is serialized with queueContext array
+      |
+      v
+Queue Worker
+  ├── Unserializes job
+  ├── RestoreJobContext middleware fires
+  │   ├── Converts array context → QueueContext
+  │   └── Calls QueuedJobsManager::restoreContext()
+  └── Job's handle() executes with full context restored
+```
 
 ## Installation
 
-```
-
+```bash
 composer require schoolpalm/queued-jobs
 ```
 
 Publish configuration:
 
+```bash
+php artisan vendor:publish --tag=queued-jobs-config
 ```
 
-php artisan vendor:publish \
---tag=queued-jobs-config
+Run migrations:
+
+```bash
+php artisan migrate
 ```
 
 ## Laravel Queue Setup
 
-The package uses Laravel's native queue system. The default recommended driver is the database queue.
+The package uses Laravel's native queue system.
 
 ### Create Queue Tables
 
-```
-
+```bash
 php artisan queue:table
-
 php artisan queue:failed-table
-
 php artisan migrate
 ```
 
 ### .env
 
 ```
-
 QUEUE_CONNECTION=database
 ```
 
 ### Run Worker
 
-```
-
+```bash
 php artisan queue:work
 ```
 
-## Creating a SchoolPalm Job
+## Creating a Context-Aware Job
 
-Module developers should extend **SchoolPalmJob** instead of Laravel's default Job class.
+Extend `ContextAwareJob`:
 
-```
-
+```php
 namespace Modules\Reports\Jobs;
 
-use SchoolPalm\QueuedJobs\Jobs\SchoolPalmJob;
+use SchoolPalm\QueuedJobs\Jobs\ContextAwareJob;
 
-class GenerateReport extends SchoolPalmJob
+class GenerateReport extends ContextAwareJob
 {
-
-    public function handle()
+    public function handle(): void
     {
-        // Generate report
-
+        $context = $this->getQueueContext();
+        // $context['tenant_id'], $context['school_id'], etc.
     }
-
 }
-
 ```
 
 ## Dispatching Jobs
 
-Jobs are dispatched normally.
+### With Automatic Context Capture
 
+```php
+QueuedJobs::job(new GenerateReport())->dispatch();
 ```
 
-GenerateReport::dispatch();
+This captures the context resolved by `resolveContextUsing()`.
+
+### With Explicit Context Overrides
+
+```php
+QueuedJobs::job(new GenerateReport())
+    ->withTenant(1)
+    ->withSchool(20)
+    ->withUser(50)
+    ->withModule('reports')
+    ->dispatch();
 ```
 
-The package automatically captures the current SchoolPalm context.
+### With Queue Configuration
 
-Example context:
-
-```
-
-[
-    "tenant_id" => "tenant_abc",
-    "school_id" => 15,
-    "user_id"   => 20
-]
+```php
+QueuedJobs::job(new GenerateReport())
+    ->onConnection('redis')
+    ->onQueue('high')
+    ->delay(now()->addMinutes(10))
+    ->dispatch();
 ```
 
 ## Context Restoration
 
 When a queue worker processes a job, the package restores the original application context before executing the job.
 
-Example:
+### Registering a Restorer
 
+```php
+QueuedJobs::restoreContextUsing(function (QueueContext $context) {
+    tenancy()->initialize($context->tenantId());
+    session(['school_id' => $context->schoolId()]);
+    auth()->loginUsingId($context->userId());
+});
 ```
 
+## Job Context Fields
 
-class RestoreContext
-{
-
-    public function handle($job, $next)
-    {
-
-        Tenant::initialize(
-            $job->context->tenantId
-        );
-
-
-        SchoolContext::set(
-            $job->context->schoolId
-        );
-
-
-        return $next($job);
-
-    }
-
-}
-
-```
-
-The job developer does not need to manually switch databases or schools.
-
-## Job Context
-
-A job context contains information required to execute a job in the same environment where it was created.
-
-| Context | Description                               |
-| ------- | ----------------------------------------- |
-| Tenant  | Identifies the tenant database            |
-| School  | Identifies the school inside a tenant     |
-| User    | Identifies the user who triggered the job |
+| Field       | Type              | Description                               |
+| ----------- | ----------------- | ----------------------------------------- |
+| `tenant_id` | string\|int\|null | Identifies the tenant database            |
+| `school_id` | string\|int\|null | Identifies the school inside a tenant     |
+| `user_id`   | string\|int\|null | Identifies the user who triggered the job |
+| `module`    | string\|null      | Module that owns the job                  |
+| `metadata`  | array             | Custom arbitrary metadata                 |
 
 ## Package Architecture
 
 ```
-
-
 src/
-
+├── Builders/
+│   ├── JobBuilder.php           # Fluent job dispatch builder
+│   └── JobResultBuilder.php     # Job result query builder
 ├── Context/
-│
-│   ├── JobContext.php
-│   └── ContextResolver.php
-│
+│   └── QueueContext.php         # Immutable context value object
+├── Enums/
+│   └── JobResultStatus.php      # Pending / Processing / Completed / Failed
+├── Facades/
+│   └── QueuedJobs.php           # Facade
 ├── Jobs/
-│
-│   └── SchoolPalmJob.php
-│
+│   └── ContextAwareJob.php      # Base job class
+├── Managers/
+│   ├── QueuedJobsManager.php    # Context capture & restore
+│   └── JobResultManager.php     # Job result CRUD
 ├── Middleware/
-│
-│   └── RestoreContext.php
-│
+│   └── RestoreJobContext.php    # Queue middleware
+├── Models/
+│   └── QueueJobResult.php       # Eloquent model
 ├── Providers/
-│
 │   └── QueuedJobsServiceProvider.php
-│
-└── Facades/
-
-    └── QueuedJobs.php
-
-
+├── Resources/
+│   └── JobResultResource.php    # API transformation
+└── Support/
+    ├── PendingJob.php           # Dispatch wrapper
+    └── QueueConfiguration.php   # Config helper
 ```
 
 ## Design Principles
 
-- Uses Laravel Queue instead of creating a custom queue system.
-- Does not manage queue storage.
-- Does not replace Laravel workers.
-- Provides SchoolPalm context awareness.
-- Allows modules to create tenant-aware background processes.
+- Uses Laravel Queue instead of creating a custom queue system
+- Does not manage queue storage
+- Does not replace Laravel workers
+- Provides context awareness for multi-tenant applications
+- Context is serialized directly in the job payload (no external stores)
+- Avoids `PendingDispatch` magic methods that can create new job instances
 
 ## Use Cases
 
-- Generating student reports
-- Processing examination results
-- Sending bulk SMS notifications
-- Generating documents
-- AI processing tasks
-- Large data imports
-- Payroll processing
-- Background synchronization
+- Generating student reports with correct school context
+- Processing examination results per tenant
+- Sending bulk SMS/email notifications as the correct user
+- Generating PDF documents with school branding
+- AI/ML processing tasks requiring tenant data isolation
+- Large data imports/exports per school
+- Payroll processing in multi-tenant environments
+- Background synchronization across modules
 
-## Future Extensions
+## Key Bug Fix (v1.0.0)
 
-- Job progress tracking using cache-store
-- Queue dashboard integration
-- Module job monitoring
-- Retry policies
-- Scheduled module jobs
+The initial release fixed a critical issue where queue context was lost during dispatch. The root cause was `PendingDispatch`'s `__call` magic method invoking `Dispatchable::dispatch()` statically, which created a new job instance without context. The fix bypasses `PendingDispatch` entirely and dispatches directly through Laravel's `Bus\Dispatcher`.
 
-## Summary
-
-**schoolpalm/queued-jobs** provides a bridge between Laravel queues and SchoolPalm's multi-tenant architecture.
-
-It enables module developers to write simple queue jobs while ensuring that tenant and school context is preserved automatically.

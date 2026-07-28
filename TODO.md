@@ -1,34 +1,14 @@
-# Debug Queue Context Loss - Progress
+# Package Pre-Publish Checklist
 
-## Steps
-
-- [x] **Step 1**: Read and analyze all relevant source files
-  - JobBuilder.php ✅
-  - PendingJob.php ✅
-  - ContextAwareJob.php ✅
-  - QueuedJobsManager.php ✅
-  - QueueContext.php ✅
-  - TestJob.php ✅
-  - JobDispatchTest.php ✅
-  - Laravel's PendingDispatch.php ✅
-  - Laravel's Bus Dispatcher.php ✅
-
-- [x] **Step 2**: Identify root cause
-  - **Found**: `PendingJob::dispatch()` calls `$this->pending()->dispatch()`
-  - `PendingDispatch` has no `dispatch()` method → triggers `__call` → runs `$this->job->dispatch()`
-  - This invokes `Dispatchable::dispatch()` static method → creates `new PendingDispatch(new static())` → **brand new job without context**
-  - The new (empty) `PendingDispatch` dispatches immediately via `__destruct`
-  - The original (correct) `PendingDispatch` kept alive by `static $pending`, dispatches at shutdown (too late)
-
-- [x] **Step 3**: Fix `src/Support/PendingJob.php`
-  - Remove delegation to `PendingDispatch` entirely
-  - Proxy `onConnection`, `onQueue`, `delay` directly to the job object
-  - `dispatch()` dispatches directly via `Bus\Dispatcher` instead of `PendingDispatch->dispatch()`
-  - Eliminate `static $pending` cache to prevent double-dispatch
-
-- [x] **Step 4**: Run tests to verify fix
-  - All 4 tests pass ✅
-  - Context is preserved in `Queue::fake()` assertion callbacks ✅
-  - Job context can override global context ✅
-  - No double-dispatch occurs ✅
+- [x] Fix `src/Support/PendingJob.php` - Remove PendingDispatch dependency (root cause of context loss)
+- [x] Fix `src/Middleware/RestoreJobContext.php` - Handle array context from serialized jobs
+- [x] Fix `src/Managers/JobResultManager.php` - Accept array|QueueContext in create()
+- [x] Fix all tests to pass (11 tests, 29 assertions)
+- [x] **Fix `config/queued-jobs.php`** - Fixed middleware class reference (`RestoreQueueContext` → `RestoreJobContext`)
+- [x] **Rewrite `README.md`** - Complete documentation with examples, API reference, architecture
+- [x] **Write `CHANGELOG.md`** - Standard keep-a-changelog format
+- [x] **Update `info.md`** - Match actual architecture with flow diagram
+- [x] **Fix `composer.json`** - Fixed test command to use `vendor/bin/pest`
+- [x] **Update `.gitignore`** - Added CHANGELOG.md entry
+- [x] **Run full test suite** - 11 tests passed (29 assertions) ✅
 

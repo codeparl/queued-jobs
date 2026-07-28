@@ -74,7 +74,7 @@ return [
 
     'middleware' => [
 
-        \SchoolPalm\QueuedJobs\Middleware\RestoreQueueContext::class,
+        \SchoolPalm\QueuedJobs\Middleware\RestoreJobContext::class,
 
     ],
 

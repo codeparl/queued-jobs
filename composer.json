@@ -3,7 +3,7 @@
     "description": "A Laravel queue infrastructure package that preserves application execution context when dispatching queued jobs.",
     "type": "library",
     "license": "MIT",
-    "version":"1.0.0",
+    "version": "1.0.0",
     "authors": [
         {
             "name": "SchoolPalm",
@@ -17,7 +17,7 @@
         "illuminate/queue": "^12.0",
         "illuminate/cache": "^12.0|^11.0"
     },
-      "require-dev": {
+    "require-dev": {
         "laravel/pint": "^1.13",
         "orchestra/testbench": "^9.0|^10.0",
         "phpunit/phpunit": "^11.0",
@@ -33,7 +33,7 @@
     "autoload-dev": {
         "psr-4": {
             "SchoolPalm\\QueuedJobs\\Tests\\": "tests/",
-             "Tests\\Fixtures\\": "tests/Fixtures/",
+            "Tests\\Fixtures\\": "tests/Fixtures/",
             "Workbench\\App\\": "workbench/app/",
             "Workbench\\Database\\Factories\\": "workbench/database/factories/",
             "Workbench\\Database\\Seeders\\": "workbench/database/seeders/"
@@ -75,7 +75,7 @@
         ],
         "test": [
             "@clear",
-            "@php vendor/bin/phpunit"
+            "@php vendor/bin/pest"
         ]
     }
 }

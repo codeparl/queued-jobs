@@ -2,8 +2,9 @@
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/schoolpalm/queued-jobs.svg?style=flat-square)](https://packagist.org/packages/schoolpalm/queued-jobs)
 [![Total Downloads](https://img.shields.io/packagist/dt/schoolpalm/queued-jobs.svg?style=flat-square)](https://packagist.org/packages/schoolpalm/queued-jobs)
+[![Tests](https://github.com/schoolpalm/queued-jobs/actions/workflows/tests.yml/badge.svg)](https://github.com/schoolpalm/queued-jobs/actions/workflows/tests.yml)
 
-A Laravel queue infrastructure package that allows module authors to dispatch queued jobs while preserving application execution context.
+A Laravel queue infrastructure package that preserves application execution context (tenant, school, user, module) when dispatching and processing queued jobs. Designed for multi-tenant and multi-school Laravel applications.
 
 ## Why?
 
@@ -23,130 +24,257 @@ composer require schoolpalm/queued-jobs
 php artisan vendor:publish --tag=queued-jobs-config
 ```
 
-## Usage
+### Run Migrations
 
-### 1. Implement the Context Resolver
-
-The consuming application must implement the `QueueContextResolver` contract to tell the package how to resolve the current context:
-
-```php
-use SchoolPalm\QueuedJobs\Contracts\QueueContextResolver;
-use SchoolPalm\QueuedJobs\Context\QueueContext;
-
-class AppQueueContextResolver implements QueueContextResolver
-{
-    public function resolve(): ?QueueContext
-    {
-        return new QueueContext(
-            tenantId: tenant()->id,
-            schoolId: school()?->id,
-            userId: auth()->id(),
-            module: app('current-module'),
-            metadata: ['ip' => request()->ip()],
-        );
-    }
-}
+```bash
+php artisan migrate
 ```
 
-Register the resolver in your service provider:
+## Quick Start
+
+### 1. Create a Context-Aware Job
+
+Extend `ContextAwareJob`:
 
 ```php
-$this->app->bind(
-    \SchoolPalm\QueuedJobs\Contracts\QueueContextResolver::class,
-    \App\Resolvers\AppQueueContextResolver::class,
-);
-```
+<?php
 
-### 2. Create Context-Aware Jobs
+namespace App\Jobs;
 
-Extend the `ContextAwareJob` base class or use the `HasQueueContext` trait:
-
-#### Option A: Extend ContextAwareJob
-
-```php
 use SchoolPalm\QueuedJobs\Jobs\ContextAwareJob;
 
-class ProcessReport extends ContextAwareJob
+class GenerateReport extends ContextAwareJob
 {
+    public function __construct(
+        private readonly array $reportData
+    ) {}
+
     public function handle(): void
     {
+        // Context is automatically available
         $context = $this->getQueueContext();
 
-        // Access tenant, school, user, etc.
-        $tenantId = $context->getTenantId();
+        $schoolId = $context['school_id'];
+        $userId   = $context['user_id'];
+        $module   = $context['module'];
+
+        // ... your job logic
     }
 }
 ```
 
-#### Option B: Use the Trait
+### 2. Register a Context Resolver
+
+In your `AppServiceProvider`:
 
 ```php
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Bus\Queueable;
-use Illuminate\Foundation\Bus\Dispatchable;
-use SchoolPalm\QueuedJobs\Jobs\Concerns\HasQueueContext;
+<?php
 
-class SendNotification implements ShouldQueue
+namespace App\Providers;
+
+use Illuminate\Support\ServiceProvider;
+use SchoolPalm\QueuedJobs\Facades\QueuedJobs;
+
+class AppServiceProvider extends ServiceProvider
 {
-    use Dispatchable, Queueable, HasQueueContext;
-
-    public function handle(): void
+    public function boot(): void
     {
-        $context = $this->getQueueContext();
-        // ...
+        QueuedJobs::resolveContextUsing(function () {
+            return [
+                'tenant_id' => tenancy()->tenant?->id,
+                'school_id' => session('school_id'),
+                'user_id'   => auth()->id(),
+                'module'    => request()->route('module'),
+                'metadata'  => [
+                    'ip' => request()->ip(),
+                ],
+            ];
+        });
     }
 }
 ```
 
-### 3. Dispatch Jobs as Usual
+### 3. Register a Context Restorer
+
+The restorer runs before each queued job executes, restoring the application state:
 
 ```php
-ProcessReport::dispatch($reportData);
+QueuedJobs::restoreContextUsing(function (QueueContext $context) {
+    // Switch tenant database
+    if ($context->tenantId()) {
+        tenancy()->initialize($context->tenantId());
+    }
+
+    // Set current school
+    if ($context->schoolId()) {
+        session(['school_id' => $context->schoolId()]);
+    }
+
+    // Authenticate user
+    if ($context->userId()) {
+        auth()->loginUsingId($context->userId());
+    }
+});
 ```
 
-The context is automatically captured at dispatch time and restored when the worker processes the job.
+### 4. Dispatch Jobs
+
+#### Using the Facade (with fluent context overrides)
+
+```php
+use SchoolPalm\QueuedJobs\Facades\QueuedJobs;
+
+// Basic dispatch — context is captured automatically
+QueuedJobs::job(new GenerateReport($data))->dispatch();
+
+// With fluent context overrides
+QueuedJobs::job(new GenerateReport($data))
+    ->withTenant(1)
+    ->withSchool(20)
+    ->withUser(50)
+    ->withModule('reports')
+    ->withMetadata(['source' => 'api'])
+    ->onQueue('high')
+    ->onConnection('redis')
+    ->delay(now()->addMinutes(5))
+    ->dispatch();
+```
+
+#### Standard Laravel Dispatch
+
+If the job is dispatched via `GenerateReport::dispatch()`, the context will NOT be attached automatically. Always use the `QueuedJobs::job()` facade to ensure context propagation.
+
+## Fluent API Reference
+
+### `QueuedJobs::job(object $job): JobBuilder`
+
+Start building a job dispatch.
+
+| Method                                    | Description                         |
+| ----------------------------------------- | ----------------------------------- |
+| `->withTenant(string\|int $id)`           | Attach tenant context               |
+| `->withSchool(string\|int $id)`           | Attach school context               |
+| `->withUser(string\|int $id)`             | Attach user context                 |
+| `->withModule(string $module)`            | Attach module context               |
+| `->withMetadata(array $data)`             | Attach arbitrary metadata           |
+| `->withContext(array\|QueueContext $ctx)` | Attach full context object or array |
+| `->onConnection(?string $conn)`           | Set queue connection                |
+| `->onQueue(?string $queue)`               | Set queue name                      |
+| `->delay($delay)`                         | Set job delay                       |
+| `->dispatch()`                            | Execute the dispatch                |
+
+### `QueuedJobs::resolveContextUsing(Closure $callback)`
+
+Register a callback that captures the current application context.
+
+### `QueuedJobs::restoreContextUsing(Closure $callback)`
+
+Register a callback that restores application context before job execution.
+
+### `QueuedJobs::context(array|QueueContext $context)`
+
+Set global or default context.
+
+## Job Result Tracking
+
+The package includes optional job result tracking with a database-backed results table.
+
+### Creating a Result
+
+```php
+use SchoolPalm\QueuedJobs\Managers\JobResultManager;
+
+$manager = app(JobResultManager::class);
+
+$result = $manager->create($job, [
+    'school_id' => 10,
+    'user_id' => 5,
+]);
+```
+
+### Marking Completion / Failure
+
+```php
+// Inside your job's handle() method
+$this->completeResult(['file' => 'report.pdf', 'pages' => 10]);
+$this->failResult('Processing failed: memory limit exceeded');
+```
+
+### Querying Results
+
+```php
+use SchoolPalm\QueuedJobs\Facades\QueuedJobs;
+
+// Get results builder
+$jobs = QueuedJobs::jobs();
+
+// Filtering
+$jobs->forSchool(10)
+     ->forUser(5)
+     ->forModule('reports')
+     ->completed()
+     ->latest();
+
+// Execute
+$results = $jobs->get();
+$result  = $jobs->first();
+$paginated = $jobs->paginate(20);
+$count   = $jobs->count();
+$exists  = $jobs->exists();
+```
+
+## Context Serialization
+
+Context is serialized with the job into the Laravel queue payload. The `QueueContext` value object is immutable and safely serializes/unserializes via PHP's native serialization. When the queue worker pops the job:
+
+1. Laravel unserializes the job (including the `queueContext` array)
+2. The `RestoreJobContext` middleware fires
+3. The array context is converted back to a `QueueContext` value object
+4. Your registered `restoreContextUsing` callback is invoked
+5. Your job's `handle()` method runs with full context restored
 
 ## Architecture
 
 ```
 src/
-├── Contracts/
-│   ├── QueueContextResolver.php    # Contract for resolving current context
-│   └── QueueContextStore.php       # Contract for storing/retrieving context
+├── Builders/
+│   ├── JobBuilder.php           # Fluent builder for job dispatch
+│   └── JobResultBuilder.php     # Query builder for job results
 ├── Context/
-│   ├── QueueContext.php            # Immutable value object
-│   └── QueueContextManager.php     # Orchestrator for context operations
-├── Jobs/
-│   ├── ContextAwareJob.php         # Base job with context support
-│   └── Concerns/
-│       └── HasQueueContext.php     # Trait for adding context to any job
-├── Middleware/
-│   └── RestoreQueueContext.php     # Queue middleware for context restoration
-├── Queue/
-│   ├── JobDispatcher.php           # Extended dispatcher with context injection
-│   └── PayloadContext.php          # Payload value object
-├── Stores/
-│   └── CacheContextStore.php       # Cache-backed context store
+│   └── QueueContext.php         # Immutable context value object
+├── Enums/
+│   └── JobResultStatus.php      # Status enum (pending/processing/completed/failed)
 ├── Facades/
-│   └── QueuedJobs.php              # Facade for QueueContextManager
+│   └── QueuedJobs.php           # Facade for QueuedJobsManager
+├── Jobs/
+│   └── ContextAwareJob.php      # Base job class with context support
+├── Managers/
+│   ├── QueuedJobsManager.php    # Core manager (context capture/restore)
+│   └── JobResultManager.php     # CRUD for job results
+├── Middleware/
+│   └── RestoreJobContext.php    # Queue middleware for context restoration
+├── Models/
+│   └── QueueJobResult.php       # Eloquent model for job results
 ├── Providers/
 │   └── QueuedJobsServiceProvider.php
-├── Support/
-│   └── QueueConfiguration.php      # Configuration helper
-└── Exceptions/
-    └── QueueContextException.php   # Domain exception
+├── Resources/
+│   └── JobResultResource.php    # API resource transformer
+└── Support/
+    ├── PendingJob.php           # Dispatch wrapper (avoids PendingDispatch)
+    └── QueueConfiguration.php   # Config accessor
 ```
 
 ## Configuration
 
-The package publishes a `config/queued-jobs.php` file with the following options:
-
-| Option                 | Description                            | Default |
-| ---------------------- | -------------------------------------- | ------- |
-| `default_store`        | Context store driver (cache, array)    | `cache` |
-| `context_resolver`     | Class for resolving current context    | `null`  |
-| `auto_restore_context` | Auto-restore context on job processing | `true`  |
-| `serialization`        | Serialization driver (json, igbinary)  | `json`  |
+| Option                 | Default                      | Description                           |
+| ---------------------- | ---------------------------- | ------------------------------------- |
+| `connection`           | `QUEUE_CONNECTION` env       | Default queue connection              |
+| `queue`                | `QUEUE_NAME` env             | Default queue name                    |
+| `capture_context`      | `true`                       | Auto-capture context on dispatch      |
+| `auto_restore_context` | `true`                       | Auto-restore context on job execution |
+| `middleware`           | `[RestoreJobContext::class]` | Middleware applied to jobs            |
+| `tries`                | `3`                          | Default job retry count               |
+| `timeout`              | `120`                        | Default job timeout (seconds)         |
 
 ## Testing
 
