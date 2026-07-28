@@ -3,94 +3,93 @@
 declare(strict_types=1);
 
 return [
-    /*
-    |--------------------------------------------------------------------------
-    | Queued Jobs Configuration
-    |--------------------------------------------------------------------------
-    |
-    | This configuration file allows you to customize the behaviour of the
-    | queue context propagation package. You can define which context
-    | resolvers are active, how context is stored, and other options.
-    |
-    */
 
     /*
     |--------------------------------------------------------------------------
-    | Default Context Store
+    | Default Queue Connection
     |--------------------------------------------------------------------------
     |
-    | Here you may specify the default context store driver that should be
-    | used by the package. The "cache" driver uses Laravel's cache system.
-    |
-    | Supported: "cache", "array"
+    | The default Laravel queue connection used when a job does not
+    | explicitly define a connection.
     |
     */
-    'default_store' => env('QUEUED_JOBS_STORE', 'cache'),
+
+    'connection' => env(
+        'QUEUE_CONNECTION',
+        'database'
+    ),
+
 
     /*
     |--------------------------------------------------------------------------
-    | Context Store Drivers
+    | Default Queue Name
     |--------------------------------------------------------------------------
     |
-    | Here you may configure the available context store drivers. Each
-    | driver has its own configuration options.
+    | The queue name used when a job does not explicitly define a queue.
     |
     */
-    'stores' => [
-        'cache' => [
-            'driver' => 'cache',
-            'store' => env('QUEUED_JOBS_CACHE_STORE', 'default'),
-            'prefix' => 'queued_jobs_context_',
-            'ttl' => 3600,
-        ],
 
-        'array' => [
-            'driver' => 'array',
-        ],
-    ],
+    'queue' => env(
+        'QUEUE_NAME',
+        'default'
+    ),
+
 
     /*
     |--------------------------------------------------------------------------
-    | Context Resolver
+    | Context Capture
     |--------------------------------------------------------------------------
     |
-    | Here you may specify the class that should be used to resolve the
-    | current application context. This should implement the
-    | QueueContextResolver contract.
+    | Determines whether the current application context should be
+    | automatically captured when dispatching context-aware jobs.
+    |
+    | Context is stored directly inside the serialized Laravel job payload.
     |
     */
-    'context_resolver' => null,
+
+    'capture_context' => true,
+
 
     /*
     |--------------------------------------------------------------------------
-    | Default Queue
+    | Context Restoration
     |--------------------------------------------------------------------------
     |
-    | The default queue connection and name that jobs should be dispatched to
-    | when no specific queue is provided.
+    | Determines whether queue workers should automatically restore
+    | application context before executing a job.
     |
     */
-    'default_queue' => env('QUEUED_JOBS_QUEUE', 'default'),
 
-    /*
-    |--------------------------------------------------------------------------
-    | Job Middleware
-    |--------------------------------------------------------------------------
-    |
-    | If set to true, the RestoreQueueContext middleware will automatically
-    | be applied to all queued jobs dispatched through the package.
-    |
-    */
     'auto_restore_context' => true,
 
+
     /*
     |--------------------------------------------------------------------------
-    | Serialization
+    | Context Middleware
     |--------------------------------------------------------------------------
     |
-    | The serialization driver to use when storing context data in the queue
-    | payload. Supported: "json", "igbinary"
+    | Middleware executed by ContextAwareJob.
     |
     */
-    'serialization' => env('QUEUED_JOBS_SERIALIZATION', 'json'),
+
+    'middleware' => [
+
+        \SchoolPalm\QueuedJobs\Middleware\RestoreQueueContext::class,
+
+    ],
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Default Job Options
+    |--------------------------------------------------------------------------
+    |
+    | Default Laravel job execution options.
+    |
+    */
+
+    'tries' => 3,
+
+    'timeout' => 120,
+
 ];

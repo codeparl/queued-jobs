@@ -6,4 +6,25 @@ workbench:
   user: schoolpalm
   guard: web
   assets: false
-  sync: []
+  install: true
+  health: false
+
+  discovers:
+    web: true
+    api: true
+    commands: true
+    components: false
+    factories: true
+    views: true
+
+  build:
+    - asset-publish
+    - create-sqlite-db
+    - db-wipe
+    - migrate-fresh
+
+
+  sync:
+    - from: storage
+      to: workbench/storage
+      reverse: true

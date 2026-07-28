@@ -4,27 +4,15 @@ declare(strict_types=1);
 
 namespace SchoolPalm\QueuedJobs\Tests;
 
-use Orchestra\Testbench\Concerns\WithWorkbench;
-use Orchestra\Testbench\TestCase as BaseTestCase;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Orchestra\Testbench\TestCase as Orchestra;
 use SchoolPalm\QueuedJobs\Providers\QueuedJobsServiceProvider;
 
-/**
- * Base test case for the QueuedJobs package.
- *
- * Extends Orchestra Testbench to provide a Laravel application
- * environment for testing.
- */
-abstract class TestCase extends BaseTestCase
+abstract class TestCase extends Orchestra
 {
-    use WithWorkbench;
+    use RefreshDatabase;
 
-    /**
-     * Get the service providers for the test environment.
-     *
-     * @param \Illuminate\Foundation\Application $app
-     *
-     * @return array<int, class-string>
-     */
+
     protected function getPackageProviders($app): array
     {
         return [
@@ -32,16 +20,72 @@ abstract class TestCase extends BaseTestCase
         ];
     }
 
-    /**
-     * Define environment setup.
-     *
-     * @param \Illuminate\Foundation\Application $app
-     *
-     * @return void
-     */
-    protected function defineEnvironment($app): void
+
+    protected function getEnvironmentSetUp($app): void
     {
-        $app['config']->set('queued-jobs.default_store', 'array');
+        /*
+        |--------------------------------------------------------------------------
+        | Database
+        |--------------------------------------------------------------------------
+        */
+
+        $app['config']->set(
+            'database.default',
+            'testing'
+        );
+
+
+        $app['config']->set(
+            'database.connections.testing',
+            [
+                'driver' => 'sqlite',
+                'database' => ':memory:',
+                'prefix' => '',
+            ]
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Queue
+        |--------------------------------------------------------------------------
+        */
+
+        $app['config']->set(
+            'queue.default',
+            'testing'
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Package Config
+        |--------------------------------------------------------------------------
+        */
+
+        $app['config']->set(
+            'queued-jobs.middleware',
+            [
+                \SchoolPalm\QueuedJobs\Middleware\RestoreJobContext::class,
+            ]
+        );
+
+
+        $app['config']->set(
+            'queued-jobs.context',
+            [
+                'tenant' => true,
+                'school' => true,
+                'user' => true,
+            ]
+        );
+    }
+
+
+    protected function defineDatabaseMigrations(): void
+    {
+        $this->loadMigrationsFrom(
+            __DIR__ . '/../database/migrations'
+        );
     }
 }
-

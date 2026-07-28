@@ -3,6 +3,7 @@
     "description": "A Laravel queue infrastructure package that preserves application execution context when dispatching queued jobs.",
     "type": "library",
     "license": "MIT",
+    "version":"1.0.0",
     "authors": [
         {
             "name": "SchoolPalm",
@@ -11,15 +12,18 @@
     ],
     "require": {
         "php": "^8.1",
-        "illuminate/contracts": "^10.0|^11.0",
-        "illuminate/support": "^10.0|^11.0",
-        "illuminate/queue": "^10.0|^11.0",
-        "illuminate/cache": "^10.0|^11.0"
+        "illuminate/contracts": "^12.0|^11.0",
+        "illuminate/support": "^12.0",
+        "illuminate/queue": "^12.0",
+        "illuminate/cache": "^12.0|^11.0"
     },
-    "require-dev": {
-        "phpunit/phpunit": "^10.0",
-        "orchestra/testbench": "^8.0|^9.0",
-        "laravel/pint": "^1.10"
+      "require-dev": {
+        "laravel/pint": "^1.13",
+        "orchestra/testbench": "^9.0|^10.0",
+        "phpunit/phpunit": "^11.0",
+        "mockery/mockery": "^1.6",
+        "pestphp/pest": "^3.8",
+        "pestphp/pest-plugin-laravel": "^3.2"
     },
     "autoload": {
         "psr-4": {
@@ -28,7 +32,11 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "SchoolPalm\\QueuedJobs\\Tests\\": "tests/"
+            "SchoolPalm\\QueuedJobs\\Tests\\": "tests/",
+             "Tests\\Fixtures\\": "tests/Fixtures/",
+            "Workbench\\App\\": "workbench/app/",
+            "Workbench\\Database\\Factories\\": "workbench/database/factories/",
+            "Workbench\\Database\\Seeders\\": "workbench/database/seeders/"
         }
     },
     "extra": {
@@ -42,9 +50,32 @@
         }
     },
     "config": {
-        "sort-packages": true
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
     },
     "minimum-stability": "dev",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "scripts": {
+        "post-autoload-dump": [
+            "@clear",
+            "@prepare"
+        ],
+        "clear": "@php vendor/bin/testbench package:purge-skeleton --ansi",
+        "prepare": "@php vendor/bin/testbench package:discover --ansi",
+        "build": "@php vendor/bin/testbench workbench:build --ansi",
+        "serve": [
+            "Composer\\Config::disableProcessTimeout",
+            "@build",
+            "@php vendor/bin/testbench serve --ansi"
+        ],
+        "lint": [
+            "@php vendor/bin/pint --ansi"
+        ],
+        "test": [
+            "@clear",
+            "@php vendor/bin/phpunit"
+        ]
+    }
 }
-
