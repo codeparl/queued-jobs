@@ -76,11 +76,118 @@ final class PendingJob
 
 
     /**
+     * Override maximum number of retry attempts.
+     *
+     * If not called, the configured default
+     * from queued-jobs config is used.
+     *
+     * @param int $tries
+     *
+     * @return static
+     */
+    public function tries(
+        int $tries
+    ): static {
+
+        $this->job->tries = $tries;
+
+        return $this;
+    }
+
+
+    /**
+     * Override job timeout.
+     *
+     * If not called, the configured default
+     * from queued-jobs config is used.
+     *
+     * @param int $seconds
+     *
+     * @return static
+     */
+    public function timeout(
+        int $seconds
+    ): static {
+
+        $this->job->timeout = $seconds;
+
+        return $this;
+    }
+
+
+    /**
+     * Override retry backoff.
+     *
+     * Examples:
+     *
+     * 60
+     *
+     * or
+     *
+     * [60,120,300]
+     *
+     * @param int|array $backoff
+     *
+     * @return static
+     */
+    public function backoff(
+        int|array $backoff
+    ): static {
+
+        $this->job->backoff = $backoff;
+
+        return $this;
+    }
+
+
+    /**
+     * Override database commit behavior.
+     *
+     * @param bool $value
+     *
+     * @return static
+     */
+    public function afterCommit(
+        bool $value = true
+    ): static {
+
+        $this->job->afterCommit = $value;
+
+        return $this;
+    }
+
+
+    /**
+     * Add job-specific middleware.
+     *
+     * These are merged with middleware
+     * configured in queued-jobs config.
+     *
+     * @param array $middleware
+     *
+     * @return static
+     */
+    public function middleware(
+        array $middleware
+    ): static {
+
+        if (method_exists($this->job, 'addMiddleware')) {
+
+            $this->job->addMiddleware(
+                $middleware
+            );
+        }
+
+        return $this;
+    }
+
+
+    /**
      * Dispatch the job.
      *
-     * Dispatches directly through the Bus Dispatcher
-     * to preserve the original job object identity
-     * and its attached queue context.
+     * Uses Laravel dispatcher directly so the
+     * original job instance and attached context
+     * are preserved.
      *
      * @return mixed
      */

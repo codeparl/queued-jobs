@@ -12,6 +12,7 @@ use Illuminate\Queue\SerializesModels;
 use SchoolPalm\QueuedJobs\Context\QueueContext;
 use SchoolPalm\QueuedJobs\Managers\JobResultManager;
 use SchoolPalm\QueuedJobs\Middleware\RestoreJobContext;
+use Illuminate\Support\Str;
 
 /**
  * Base class for all context-aware queued jobs.
@@ -43,7 +44,7 @@ abstract class ContextAwareJob implements ShouldQueue
      * @var array<string, mixed>
      */
     protected array $queueContext = [];
-
+    protected array $additionalMiddleware = [];
     /**
      * Identifier of the persisted job result record.
      *
@@ -105,7 +106,7 @@ abstract class ContextAwareJob implements ShouldQueue
         return null;
     }
 
- 
+
 
     /**
      * Get the serialized queue context.
@@ -115,6 +116,19 @@ abstract class ContextAwareJob implements ShouldQueue
     public function getQueueContext(): array
     {
         return $this->queueContext;
+    }
+
+    /**
+     * Add middleware for this job instance.
+     */
+    public function addMiddleware(
+        array $middleware
+    ): void {
+
+        $this->additionalMiddleware = array_merge(
+            $this->additionalMiddleware,
+            $middleware
+        );
     }
 
     /**
@@ -135,7 +149,7 @@ abstract class ContextAwareJob implements ShouldQueue
         );
 
         return array_map(
-            fn (string $class) => app($class),
+            fn(string $class) => app($class),
             $middleware
         );
     }
