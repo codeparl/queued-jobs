@@ -13,25 +13,27 @@ final class JobResultManager
 
     public function create(
         object $job,
-        QueueContext|array $context
+        array $context = []
     ): QueueJobResult {
-
-        if (is_array($context)) {
-            $context = QueueContext::fromArray($context);
-        }
 
         return QueueJobResult::create([
 
             'job_class' => $job::class,
 
+            // Store dashboard metadata
+            'title' => method_exists($job, 'title')
+                ? $job->title()
+                : class_basename($job),
+
+            'description' => method_exists($job, 'description')
+                ? $job->description()
+                : null,
+
             'status' => JobResultStatus::Pending->value,
 
-            'school_id' => $context->schoolId(),
-
-            'user_id' => $context->userId(),
-
-            'module' => $context->module(),
-
+            'school_id' => $context['school_id'] ?? null,
+            'user_id' => $context['user_id'] ?? null,
+            'module' => $context['module'] ?? null,
         ]);
     }
 

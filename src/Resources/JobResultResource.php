@@ -32,7 +32,8 @@ final class JobResultResource
             'school_id' => $this->job->school_id,
 
             'user_id' => $this->job->user_id,
-
+            'title' => $this->job->title,
+            'description' => $this->job->description,
             'module' => $this->job->module,
 
 

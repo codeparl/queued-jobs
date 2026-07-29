@@ -23,6 +23,10 @@ return new class extends Migration
                 ->nullable()
                 ->index();
 
+                 // New fields
+    $table->string('title');
+    $table->text('description')->nullable();
+
 
             /**
              * Job class name.
