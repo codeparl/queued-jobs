@@ -6,6 +6,7 @@ namespace SchoolPalm\QueuedJobs\Facades;
 
 use Illuminate\Support\Facades\Facade;
 use SchoolPalm\QueuedJobs\Builders\JobBuilder;
+use SchoolPalm\QueuedJobs\Builders\JobResultBuilder;
 use SchoolPalm\QueuedJobs\Managers\QueuedJobsManager;
 
 /**
@@ -15,6 +16,9 @@ use SchoolPalm\QueuedJobs\Managers\QueuedJobsManager;
  *
  * @method static JobBuilder job(object $job)
  * Start building a queued job.
+ *
+ * @method static JobResultBuilder jobs()
+ * Start querying queued job results.
  *
  * @method static void resolveContextUsing(\Closure $callback)
  * Register a callback used to capture the current application context.

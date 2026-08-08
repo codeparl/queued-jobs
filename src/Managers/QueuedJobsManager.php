@@ -8,6 +8,7 @@ use Closure;
 use SchoolPalm\QueuedJobs\Builders\JobBuilder;
 use SchoolPalm\QueuedJobs\Builders\JobResultBuilder;
 use SchoolPalm\QueuedJobs\Context\QueueContext;
+use SchoolPalm\QueuedJobs\Managers\JobResultManager;
 
 final class QueuedJobsManager
 {
@@ -50,7 +51,8 @@ final class QueuedJobsManager
 
         return new JobBuilder(
             $job,
-            $this
+            $this,
+            app(JobResultManager::class)
         );
     }
 

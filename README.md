@@ -150,25 +150,28 @@ If the job is dispatched via `GenerateReport::dispatch()`, the context will NOT 
 
 Start building a job dispatch.
 
-| Method                                    | Description                         |
-| ----------------------------------------- | ----------------------------------- |
-| `->withTenant(string\|int $id)`           | Attach tenant context               |
-| `->withSchool(string\|int $id)`           | Attach school context               |
-| `->withUser(string\|int $id)`             | Attach user context                 |
-| `->withModule(string $module)`            | Attach module context               |
-| `->withMetadata(array $data)`             | Attach arbitrary metadata           |
-| `->withContext(array\|QueueContext $ctx)` | Attach full context object or array |
-| `->onConnection(?string $conn)`           | Set queue connection                |
-| `->onQueue(?string $queue)`               | Set queue name                      |
-| `->delay($delay)`                         | Set job delay                       |
-| `->tries(int $tries)`                     | Override max retry attempts         |
-| `->timeout(int $seconds)`                 | Override job timeout                |
-| `->backoff(int\|array $backoff)`          | Override retry backoff              |
-| `->afterCommit(bool $value = true)`       | Dispatch after DB commit            |
-| `->middleware(array $middleware)`         | Add job-specific middleware         |
-| `->sync()`                                | Dispatch synchronously (immediate)  |
-| `->dispatch()`                            | Execute the dispatch                |
-| `->dispatchSync()`                        | Execute synchronously (immediate)   |
+| Method                                    | Description                                          |
+| ----------------------------------------- | ---------------------------------------------------- |
+| `->withTenant(string\|int $id)`           | Attach tenant context                                |
+| `->withSchool(string\|int $id)`           | Attach school context                                |
+| `->withUser(string\|int $id)`             | Attach user context                                  |
+| `->withModule(string $module)`            | Attach module context                                |
+| `->withMetadata(array $data)`             | Attach arbitrary metadata                            |
+| `->withContext(array\|QueueContext $ctx)` | Attach full context object or array                  |
+| `->onConnection(?string $conn)`           | Set queue connection                                 |
+| `->onQueue(?string $queue)`               | Set queue name                                       |
+| `->delay($delay)`                         | Set job delay                                        |
+| `->tries(int $tries)`                     | Override max retry attempts                          |
+| `->timeout(int $seconds)`                 | Override job timeout                                 |
+| `->backoff(int\|array $backoff)`          | Override retry backoff                               |
+| `->afterCommit(bool $value = true)`       | Dispatch after DB commit                             |
+| `->middleware(array $middleware)`         | Add job-specific middleware                          |
+| `->sync()`                                | Dispatch synchronously (immediate)                   |
+| `->dispatch()`                            | Execute the dispatch                                 |
+| `->dispatchSync()`                        | Execute synchronously (immediate)                    |
+| `->result()`                              | Get the created `QueueJobResult` (or `null`)         |
+| `->resultResource()`                      | Get a `JobResultResource` for the result (or `null`) |
+| `->resultArray()`                         | Get the result as an API-friendly array (or `null`)  |
 
 ### `QueuedJobs::resolveContextUsing(Closure $callback)`
 
@@ -187,6 +190,23 @@ Set global or default context.
 The package includes optional job result tracking with a database-backed results table.
 
 ### Creating a Result
+
+For jobs extending `ContextAwareJob`, a result record is created **automatically** when
+the job is dispatched through `QueuedJobs::job(...)->dispatch()`. The created record
+uses the resolved queue context (school, user, module) and is exposed through the builder:
+
+```php
+$builder = QueuedJobs::job(new GenerateReport($data))
+    ->withSchool(10)
+    ->dispatch();
+
+// Access the created result directly after dispatch
+$result = $builder->result();                 // QueueJobResult model
+$resource = $builder->resultResource();       // JobResultResource
+$array = $builder->resultArray();             // API-friendly array
+```
+
+You can also create result records manually with `JobResultManager`:
 
 ```php
 use SchoolPalm\QueuedJobs\Managers\JobResultManager;
@@ -228,6 +248,10 @@ $result  = $jobs->first();
 $paginated = $jobs->paginate(20);
 $count   = $jobs->count();
 $exists  = $jobs->exists();
+
+// Or obtain API-friendly resources directly
+$resources = $jobs->resources();        // array of JobResultResource arrays
+$firstResource = $jobs->firstResource(); // single array or null
 ```
 
 ## Context Serialization

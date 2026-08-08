@@ -3,7 +3,7 @@
     "description": "A Laravel queue infrastructure package that preserves application execution context when dispatching queued jobs.",
     "type": "library",
     "license": "MIT",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "authors": [
         {
             "name": "SchoolPalm",

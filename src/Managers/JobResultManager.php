@@ -93,4 +93,27 @@ final class JobResultManager
 
         return $result;
     }
+
+
+    /**
+     * Attach the Laravel queue job identifier to a result record.
+     *
+     * This links the persisted result to the queue job that
+     * was actually dispatched so it can be traced later.
+     */
+    public function attachJobId(
+        string $id,
+        string|int $jobId
+    ): QueueJobResult {
+
+        $result = QueueJobResult::findOrFail($id);
+
+        $result->update([
+
+            'job_id' => (string) $jobId,
+
+        ]);
+
+        return $result;
+    }
 }

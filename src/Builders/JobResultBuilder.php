@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use SchoolPalm\QueuedJobs\Enums\JobResultStatus;
 use SchoolPalm\QueuedJobs\Models\QueueJobResult;
+use SchoolPalm\QueuedJobs\Resources\JobResultResource;
 
 final class JobResultBuilder
 {
@@ -163,6 +164,35 @@ final class JobResultBuilder
     public function get(): Collection
     {
         return $this->query->get();
+    }
+
+    /**
+     * Execute and return all results as API resources.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    public function resources(): array
+    {
+        return JobResultResource::collection(
+            $this->query->get()
+        );
+    }
+
+    /**
+     * Return the first matching result as an API resource.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function firstResource(): ?array
+    {
+        $result = $this->query->first();
+
+        if ($result === null) {
+            return null;
+        }
+
+        return JobResultResource::make($result)
+            ->toArray();
     }
 
     /**

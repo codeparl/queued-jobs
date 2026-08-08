@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace SchoolPalm\QueuedJobs\Builders;
 
 use SchoolPalm\QueuedJobs\Context\QueueContext;
+use SchoolPalm\QueuedJobs\Managers\JobResultManager;
 use SchoolPalm\QueuedJobs\Managers\QueuedJobsManager;
+use SchoolPalm\QueuedJobs\Models\QueueJobResult;
+use SchoolPalm\QueuedJobs\Resources\JobResultResource;
 use SchoolPalm\QueuedJobs\Support\PendingJob;
 
 final class JobBuilder
@@ -66,11 +69,17 @@ final class JobBuilder
      */
     private bool $sync = false;
 
+    /**
+     * Created job result model (if this job is result-aware).
+     */
+    private ?QueueJobResult $result = null;
+
 
 
     public function __construct(
         private readonly object $job,
-        private readonly QueuedJobsManager $manager
+        private readonly QueuedJobsManager $manager,
+        private readonly JobResultManager $resultManager
     ) {
 
         $this->context = new QueueContext();
@@ -260,7 +269,7 @@ final class JobBuilder
     }
 
 
- 
+
     /**
      * Override retry backoff.
      *
@@ -354,6 +363,26 @@ final class JobBuilder
         }
 
 
+        // Create a persisted job result record for result-aware jobs.
+        if (
+            method_exists($this->job, 'setJobResultId')
+        ) {
+
+            $this->result = $this->resultManager->create(
+                $this->job,
+                [
+                    'school_id' => $context->schoolId(),
+                    'user_id' => $context->userId(),
+                    'module' => $context->module(),
+                ]
+            );
+
+            $this->job->setJobResultId(
+                $this->result->id
+            );
+        }
+
+
         $pending = new PendingJob(
             $this->job
         );
@@ -405,11 +434,18 @@ final class JobBuilder
      * Dispatch the job.
      *
      * Dispatches onto the default queue connection.
+     * When a dispatch id is returned it is attached to the
+     * persisted job result record.
      */
     public function dispatch(): mixed
     {
-        return $this->prepare()
-            ->dispatch();
+        $pending = $this->prepare();
+
+        $dispatched = $pending->dispatch();
+
+        $this->attachQueuedJobId($dispatched);
+
+        return $dispatched;
     }
 
 
@@ -420,7 +456,76 @@ final class JobBuilder
     public function dispatchSync(): mixed
     {
         return $this->sync()
-            ->prepare()
             ->dispatch();
+    }
+
+
+
+    /**
+     * Get the created job result model.
+     *
+     * Returns null when the underlying job is not result-aware
+     * (i.e. it does not expose setJobResultId()).
+     */
+    public function result(): ?QueueJobResult
+    {
+        return $this->result;
+    }
+
+
+
+    /**
+     * Get a JobResultResource for the created result.
+     *
+     * Returns null when no result was created.
+     */
+    public function resultResource(): ?JobResultResource
+    {
+        if ($this->result === null) {
+            return null;
+        }
+
+        return JobResultResource::make($this->result);
+    }
+
+
+
+    /**
+     * Get the created result as an API-friendly array.
+     *
+     * Returns null when no result was created.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function resultArray(): ?array
+    {
+        return $this->resultResource()?->toArray();
+    }
+
+
+
+    /**
+     * Attach the Laravel queue job id to the persisted result.
+     *
+     * @param mixed $dispatched
+     */
+    private function attachQueuedJobId(
+        mixed $dispatched
+    ): void {
+
+        if (
+            $this->result === null
+            || ! is_string($dispatched)
+            && ! is_int($dispatched)
+        ) {
+            return;
+        }
+
+        $this->resultManager->attachJobId(
+            $this->result->id,
+            $dispatched
+        );
+
+        $this->result->refresh();
     }
 }
