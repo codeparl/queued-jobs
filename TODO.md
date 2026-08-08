@@ -1,14 +1,21 @@
-# Package Pre-Publish Checklist
+# TODO: Add fluent dispatch-option APIs to JobBuilder
 
-- [x] Fix `src/Support/PendingJob.php` - Remove PendingDispatch dependency (root cause of context loss)
-- [x] Fix `src/Middleware/RestoreJobContext.php` - Handle array context from serialized jobs
-- [x] Fix `src/Managers/JobResultManager.php` - Accept array|QueueContext in create()
-- [x] Fix all tests to pass (11 tests, 29 assertions)
-- [x] **Fix `config/queued-jobs.php`** - Fixed middleware class reference (`RestoreQueueContext` → `RestoreJobContext`)
-- [x] **Rewrite `README.md`** - Complete documentation with examples, API reference, architecture
-- [x] **Write `CHANGELOG.md`** - Standard keep-a-changelog format
-- [x] **Update `info.md`** - Match actual architecture with flow diagram
-- [x] **Fix `composer.json`** - Fixed test command to use `vendor/bin/pest`
-- [x] **Update `.gitignore`** - Added CHANGELOG.md entry
-- [x] **Run full test suite** - 11 tests passed (29 assertions) ✅
+## Steps
 
+- [x] 1. Add private property storage to `JobBuilder` for dispatch options
+       (connection, queue, delay, tries, timeout, backoff, afterCommit, middleware).
+- [x] 2. Add fluent methods to `JobBuilder`:
+       `onConnection`, `onQueue`, `delay`, `tries`, `timeout`, `backoff`,
+       `afterCommit`, `middleware`.
+- [x] 3. Add `sync()` method to `JobBuilder` for immediate (synchronous) execution.
+- [x] 4. Update `prepare()` to apply stored dispatch options to the `PendingJob`.
+- [x] 5. Add tests verifying fluent chaining and `sync()`.
+- [x] 6. Run `composer test` to confirm all tests pass.
+
+## Notes
+
+- `PendingJob` gained a `sync()` mode executing via the Bus `dispatchSync`
+  (routes to Laravel's "sync" queue connection, running middleware).
+- `JobBuilder::dispatchSync()` added as a convenience for synchronous dispatch.
+- README and CHANGELOG updated to document the new APIs.
+- All 15 tests pass (33 assertions).

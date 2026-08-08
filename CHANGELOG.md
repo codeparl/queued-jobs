@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-07-30
+
+### Added
+
+- `JobBuilder` now exposes full fluent dispatch-option APIs directly, matching the README:
+  - `onQueue()`, `onConnection()`, `delay()` were previously only on `PendingJob` — now chainable on `JobBuilder`
+  - `tries()`, `timeout()`, `backoff()`, `afterCommit()`, `middleware()` added to `JobBuilder`
+  - `sync()` and `dispatchSync()` for immediate (synchronous) execution
+- `PendingJob` gained a `sync()` mode to execute jobs immediately via the sync dispatcher
+- Tests verifying fluent queue options and synchronous dispatch
+
 ## [1.0.0] - 2026-07-30
 
 ### Added

@@ -161,7 +161,14 @@ Start building a job dispatch.
 | `->onConnection(?string $conn)`           | Set queue connection                |
 | `->onQueue(?string $queue)`               | Set queue name                      |
 | `->delay($delay)`                         | Set job delay                       |
+| `->tries(int $tries)`                     | Override max retry attempts         |
+| `->timeout(int $seconds)`                 | Override job timeout                |
+| `->backoff(int\|array $backoff)`          | Override retry backoff              |
+| `->afterCommit(bool $value = true)`       | Dispatch after DB commit            |
+| `->middleware(array $middleware)`         | Add job-specific middleware         |
+| `->sync()`                                | Dispatch synchronously (immediate)  |
 | `->dispatch()`                            | Execute the dispatch                |
+| `->dispatchSync()`                        | Execute synchronously (immediate)   |
 
 ### `QueuedJobs::resolveContextUsing(Closure $callback)`
 

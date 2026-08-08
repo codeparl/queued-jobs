@@ -190,3 +190,96 @@ it('stores failed job errors', function () {
     expect($result->error['message'])
         ->toBe('Something failed');
 });
+
+it('allows fluent queue dispatch options', function () {
+
+    Queue::fake();
+
+
+    QueuedJobs::job(
+        new TestJob()
+    )
+        ->onQueue('high')
+        ->onConnection('redis')
+        ->delay(now()->addMinutes(5))
+        ->dispatch();
+
+
+    Queue::assertPushed(
+        TestJob::class,
+        function (TestJob $job) {
+
+            return $job->queue === 'high'
+                && $job->connection === 'redis';
+        }
+    );
+});
+
+it('allows retry and timeout options', function () {
+
+    Queue::fake();
+
+
+    QueuedJobs::job(
+        new TestJob()
+    )
+        ->tries(5)
+        ->timeout(60)
+        ->backoff([10, 20, 30])
+        ->dispatch();
+
+
+    Queue::assertPushed(
+        TestJob::class,
+        function (TestJob $job) {
+
+            return $job->tries === 5
+                && $job->timeout === 60
+                && $job->backoff === [10, 20, 30];
+        }
+    );
+});
+
+it('dispatches synchronously when sync is used', function () {
+
+    // Queue::fake() is intentionally NOT used here, because the
+    // "sync" connection executes the job immediately on the current
+    // process. Execution is observed via the static flag since the
+    // sync queue runs a serialized copy of the job instance.
+
+
+    TestJob::$wasExecuted = false;
+
+    $job = new TestJob();
+
+    QueuedJobs::job($job)
+        ->sync()
+        ->withMetadata(['request_id' => 123])
+        ->dispatch();
+
+
+    // The job must have been executed synchronously.
+    expect(TestJob::$wasExecuted)
+        ->toBeTrue();
+});
+
+it('supports dispatchSync for immediate execution', function () {
+
+    // Queue::fake() is intentionally NOT used here, because the
+    // "sync" connection executes the job immediately on the current
+    // process. Execution is observed via the static flag since the
+    // sync queue runs a serialized copy of the job instance.
+
+
+    TestJob::$wasExecuted = false;
+
+    $job = new TestJob();
+
+    QueuedJobs::job($job)
+        ->dispatchSync();
+
+
+    // The job must have been executed synchronously.
+    expect(TestJob::$wasExecuted)
+        ->toBeTrue();
+});

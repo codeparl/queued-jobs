@@ -19,6 +19,11 @@ use Illuminate\Contracts\Bus\Dispatcher;
  */
 final class PendingJob
 {
+    /**
+     * Whether to dispatch synchronously.
+     */
+    private bool $sync = false;
+
     public function __construct(
         private readonly object $job
     ) {}
@@ -183,16 +188,45 @@ final class PendingJob
 
 
     /**
+     * Dispatch the job synchronously (immediately).
+     *
+     * When sync mode is enabled, the job runs
+     * immediately on the current process instead
+     * of being pushed onto a queue.
+     *
+     * @return static
+     */
+    public function sync(): static
+    {
+        $this->sync = true;
+
+        return $this;
+    }
+
+
+
+    /**
      * Dispatch the job.
      *
      * Uses Laravel dispatcher directly so the
      * original job instance and attached context
      * are preserved.
      *
+     * When sync mode is enabled, the job is executed
+     * immediately on the current process (via the Bus
+     * dispatcher), preserving the original job instance.
+     *
      * @return mixed
      */
     public function dispatch(): mixed
     {
+        if ($this->sync) {
+
+            return app(Dispatcher::class)
+                ->dispatchSync($this->job);
+        }
+
+
         return app(Dispatcher::class)
             ->dispatch($this->job);
     }
